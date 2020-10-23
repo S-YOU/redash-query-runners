@@ -9,7 +9,7 @@ import pystache
 from redash import models
 from redash.permissions import has_access, not_view_only
 from redash.query_runner import *
-from redash.query_runner.query_results import _guess_type, fix_column_name
+from redash.query_runner.query_results import guess_type, fix_column_name
 from redash.utils import JSONEncoder
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def create_tables_from_query_ids(user, connection, tables, query_ids, query_para
             raise Exception('Failed loading results for query id {}.'.format(query.id))
 
         results = json.loads(results)
-        tmp_table_name = 'query_{}'.format(hashlib.md5(tables[i]).hexdigest()[0:8])
+        tmp_table_name = 'query_{}'.format(hashlib.md5(tables[i].encode("utf8")).hexdigest()[0:8])
         create_table(connection, tmp_table_name, results)
 
 
@@ -90,6 +90,7 @@ def create_table(connection, table_name, query_results):
 
 
 class ResultsEx(BaseQueryRunner):
+    should_annotate_query = False
     noop_query = 'SELECT 1'
 
     @classmethod
@@ -98,10 +99,6 @@ class ResultsEx(BaseQueryRunner):
             'type': 'object',
             'properties': {},
         }
-
-    @classmethod
-    def annotate_query(cls):
-        return False
 
     @classmethod
     def name(cls):
@@ -117,7 +114,7 @@ class ResultsEx(BaseQueryRunner):
 
         try:
             for i, table in enumerate(tables):
-                tmp_table_name = 'query_{}'.format(hashlib.md5(tables[i]).hexdigest()[0:8])
+                tmp_table_name = 'query_{}'.format(hashlib.md5(tables[i].encode("utf8")).hexdigest()[0:8])
                 query = query.replace(table, tmp_table_name, 1)
             cursor.execute(query)
 
@@ -130,7 +127,7 @@ class ResultsEx(BaseQueryRunner):
 
                 for i, row in enumerate(cursor):
                     for j, col in enumerate(row):
-                        guess = _guess_type(col)
+                        guess = guess_type(col)
 
                         if columns[j]['type'] is None:
                             columns[j]['type'] = guess
